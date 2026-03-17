@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { ArrowRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/Badge";
 import { Button } from "@/components/Button";
 import { ButtonLink } from "@/components/ButtonLink";
@@ -22,6 +23,7 @@ function computeReadiness(role: string, skills: string[]) {
 }
 
 export function OnboardingPage() {
+  const navigate = useNavigate();
   const [role, setRole] = useState(onboardingRoleOptions[0]);
   const [company, setCompany] = useState("Microsoft");
   const [salaryGoal, setSalaryGoal] = useState("30 LPA");
@@ -60,13 +62,22 @@ export function OnboardingPage() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    await onboardingMutation.mutateAsync({
+    const result = await onboardingMutation.mutateAsync({
       targetRole: role,
       targetCompany: company,
       salaryGoal,
       experienceLevel,
       currentSkills: skills,
       preferredLocations
+    });
+
+    navigate("/app/dashboard", {
+      replace: true,
+      state: {
+        onboardingComplete: true,
+        source: result.source,
+        nextBestAction: result.readiness.nextBestAction
+      }
     });
   }
 
@@ -147,20 +158,9 @@ export function OnboardingPage() {
                 <p className="muted-copy">{onboardingMutation.error.message}</p>
               </div>
             ) : null}
-            {onboardingMutation.isSuccess ? (
-              <div className="empty-state">
-                <strong>
-                  {onboardingMutation.data.source === "supabase"
-                    ? "Career baseline saved"
-                    : "Demo baseline generated"}
-                </strong>
-                <p className="muted-copy">
-                  {onboardingMutation.data.source === "supabase"
-                    ? "Your career goal and latest readiness snapshot are now stored in Supabase."
-                    : "Supabase is not configured for this session, so the page is showing the local demo fallback."}
-                </p>
-              </div>
-            ) : null}
+            <p className="muted-copy">
+              Submitting this saves your baseline, refreshes readiness, and takes you straight into the live dashboard.
+            </p>
             <div className="action-row">
               <Button variant="primary" type="submit" disabled={onboardingMutation.isPending}>
                 {onboardingMutation.isPending ? "Generating plan…" : "Generate career plan"}

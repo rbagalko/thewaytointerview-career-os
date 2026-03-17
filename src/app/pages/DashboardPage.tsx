@@ -1,5 +1,5 @@
 import { ArrowRight, Star } from "lucide-react";
-import { Button } from "@/components/Button";
+import { useLocation } from "react-router-dom";
 import { ButtonLink } from "@/components/ButtonLink";
 import { JobCard } from "@/components/JobCard";
 import { MetricCard } from "@/components/MetricCard";
@@ -9,7 +9,18 @@ import { SectionHeader } from "@/components/SectionHeader";
 import { useDashboardQuery } from "@/lib/api/queries";
 
 export function DashboardPage() {
+  const location = useLocation();
   const { data, error, isPending } = useDashboardQuery();
+  const flashState = location.state as
+    | {
+        onboardingComplete?: boolean;
+        source?: "mock" | "supabase";
+        nextBestAction?: {
+          route?: string;
+          cta?: string;
+        };
+      }
+    | null;
 
   if (isPending) {
     return (
@@ -43,6 +54,33 @@ export function DashboardPage() {
 
   return (
     <div className="page">
+      {flashState?.onboardingComplete ? (
+        <Panel className="hero-panel">
+          <SectionHeader
+            eyebrow="Career baseline saved"
+            title={
+              flashState.source === "supabase"
+                ? "Your live readiness system is now active"
+                : "Your demo readiness system is ready"
+            }
+            copy={
+              flashState.source === "supabase"
+                ? "We stored your target role, locations, and skills, then generated a fresh readiness snapshot. Use job discovery next to shortlist the best 90-day-fit roles."
+                : "Supabase is not configured in this session, so the app generated a local baseline and routed you into the dashboard experience."
+            }
+            action={
+              <ButtonLink
+                to={flashState.nextBestAction?.route ?? "/app/jobs"}
+                variant="accent"
+              >
+                {flashState.nextBestAction?.cta ?? "Open job discovery"}
+                <ArrowRight size={16} />
+              </ButtonLink>
+            }
+          />
+        </Panel>
+      ) : null}
+
       <Panel className="hero-panel">
         <SectionHeader
           eyebrow="Career dashboard"
