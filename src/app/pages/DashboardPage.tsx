@@ -65,8 +65,8 @@ export function DashboardPage() {
             }
             copy={
               flashState.source === "supabase"
-                ? "We stored your target role, locations, and skills, then generated a fresh readiness snapshot. Use job discovery next to shortlist the best 90-day-fit roles."
-                : "Supabase is not configured in this session, so the app generated a local baseline and routed you into the dashboard experience."
+                ? "We saved your target role, locations, and skills, then generated a fresh readiness snapshot. Use job discovery next to shortlist the best 90-day-fit roles."
+                : "Live workspace services are not configured in this session, so the app generated a local baseline and routed you into the dashboard experience."
             }
             action={
               <ButtonLink
@@ -163,7 +163,7 @@ export function DashboardPage() {
         ) : (
           <div className="empty-state">
             <strong>No job matches yet</strong>
-            <p className="muted-copy">Once you save onboarding data and seed jobs into Supabase, this panel will show scored opportunities.</p>
+            <p className="muted-copy">Once you complete onboarding and relevant jobs are available, this panel will show scored opportunities.</p>
           </div>
         )}
       </Panel>

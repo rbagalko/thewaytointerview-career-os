@@ -72,7 +72,7 @@ export function InsightsPanel() {
           Product status
         </h3>
         <p className="muted-copy">
-          Your dashboard, jobs, CRM, prep, resume, JD analysis, and LinkedIn modules now run on live Supabase data.
+          Your dashboard, jobs, CRM, prep, resume, JD analysis, and LinkedIn modules now run on live workspace data.
         </p>
       </div>
     </aside>

@@ -18,6 +18,7 @@ Docs in this pack:
 - [Feature Specifications](docs/launch-spec/05-feature-specifications.md)
 - [Deployment Checklist](docs/launch-spec/06-deployment-checklist.md)
 - [Cloudflare Pages Deployment](docs/launch-spec/07-cloudflare-pages.md)
+- [Mock Interview Engine](docs/launch-spec/08-mock-interview-engine.md)
 
 Recommended launch scope for March 19, 2026:
 

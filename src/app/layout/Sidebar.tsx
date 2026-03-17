@@ -59,7 +59,7 @@ export function Sidebar() {
       <div className="footer-note">
         Live Career OS workspace.
         <br />
-        Supabase-backed product with Cloudflare deployment.
+        Production pilot running on secure cloud infrastructure.
       </div>
     </aside>
   );

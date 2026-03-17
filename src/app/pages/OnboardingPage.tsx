@@ -87,7 +87,7 @@ export function OnboardingPage() {
         <SectionHeader
           eyebrow="Smooth onboarding"
           title="Build the user's career cockpit in under three minutes"
-          copy="This form writes career goals and skills into Supabase, then creates a fresh readiness snapshot for the dashboard, jobs, and prep engine."
+          copy="This form saves career goals and skills to your workspace, then creates a fresh readiness snapshot for the dashboard, jobs, and prep engine."
         />
       </Panel>
 

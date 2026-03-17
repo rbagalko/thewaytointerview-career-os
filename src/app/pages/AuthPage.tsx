@@ -58,7 +58,7 @@ export function AuthPage() {
                 <SectionHeader
                   eyebrow="Secure access"
                   title="Sign in to your career operating system"
-                  copy="Supabase auth is now wired into the app shell. Use your test user or create a new account below."
+                  copy="Use your account to unlock a saved career workspace across onboarding, jobs, prep, resume, and applications."
                 />
                 <div className="badge-row">
                   <button
@@ -130,20 +130,20 @@ export function AuthPage() {
               <Panel>
                 <SectionHeader
                   title="What happens after login"
-                  copy="Authenticated users can now persist onboarding, generate readiness snapshots, and query live job matches from Supabase."
+                  copy="Once you sign in, your onboarding, readiness, job matches, and application workflow stay attached to your personal workspace."
                 />
                 <div className="list-stack">
                   <div className="split-list-item">
                     <strong>Onboarding persists</strong>
-                    <span>`career_goals` + `candidate_profiles`</span>
+                    <span>Target role, skills, and locations stay saved</span>
                   </div>
                   <div className="split-list-item">
                     <strong>Readiness updates</strong>
-                    <span>`readiness_snapshots`</span>
+                    <span>Your role baseline refreshes as you work</span>
                   </div>
                   <div className="split-list-item">
                     <strong>Jobs are scored live</strong>
-                    <span>`get_job_discovery()` RPC</span>
+                    <span>Discovery keeps matching roles to your current state</span>
                   </div>
                 </div>
               </Panel>
@@ -154,4 +154,3 @@ export function AuthPage() {
     </main>
   );
 }
-

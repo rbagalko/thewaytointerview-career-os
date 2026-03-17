@@ -114,7 +114,7 @@ export function JDAnalyzerPage() {
             <div className="empty-state">
               <strong>JD analysis saved</strong>
               <p className="muted-copy">
-                Your latest role breakdown, gap list, and interview-round prediction are now stored in Supabase.
+                Your latest role breakdown, gap list, and interview-round prediction are now saved to your workspace.
               </p>
             </div>
           ) : null}

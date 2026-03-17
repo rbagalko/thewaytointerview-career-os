@@ -120,7 +120,7 @@ export function LinkedInPage() {
             <div className="empty-state">
               <strong>LinkedIn optimization saved</strong>
               <p className="muted-copy">
-                Your latest profile score, suggested headline, and summary are now stored in Supabase.
+                Your latest profile score, suggested headline, and summary are now saved to your workspace.
               </p>
             </div>
           ) : null}

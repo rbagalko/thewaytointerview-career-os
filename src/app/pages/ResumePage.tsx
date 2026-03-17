@@ -126,7 +126,7 @@ export function ResumePage() {
             <div className="empty-state">
               <strong>Resume analysis saved</strong>
               <p className="muted-copy">
-                Your latest ATS score is now stored in Supabase and reflected in the dashboard.
+                Your latest ATS score is now saved to your workspace and reflected in the dashboard.
               </p>
             </div>
           ) : null}
