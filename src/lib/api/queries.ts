@@ -7,9 +7,11 @@ import {
   getJobs,
   getLinkedInSuggestions,
   getResumeSuggestions,
-  submitOnboarding
+  saveJob,
+  submitOnboarding,
+  trackJob
 } from "@/lib/api/repository";
-import { type OnboardingInput } from "@/lib/types";
+import { type JobOpportunity, type OnboardingInput } from "@/lib/types";
 
 export function useDashboardQuery() {
   return useQuery({
@@ -60,16 +62,43 @@ export function useFeatureFlagsQuery() {
   });
 }
 
+function invalidateCareerQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+    queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+    queryClient.invalidateQueries({ queryKey: ["applications"] })
+  ]);
+}
+
 export function useOnboardingMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (input: OnboardingInput) => submitOnboarding(input),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
-        queryClient.invalidateQueries({ queryKey: ["jobs"] })
-      ]);
+      await invalidateCareerQueries(queryClient);
+    }
+  });
+}
+
+export function useSaveJobMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (job: JobOpportunity) => saveJob(job),
+    onSuccess: async () => {
+      await invalidateCareerQueries(queryClient);
+    }
+  });
+}
+
+export function useTrackJobMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (job: JobOpportunity) => trackJob(job),
+    onSuccess: async () => {
+      await invalidateCareerQueries(queryClient);
     }
   });
 }

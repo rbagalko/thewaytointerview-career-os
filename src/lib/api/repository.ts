@@ -9,6 +9,7 @@ import {
 } from "@/lib/mock-data";
 import { supabase } from "@/lib/supabase";
 import {
+  type ApplicationCard,
   type ApplicationStage,
   type DashboardPayload,
   type FeatureFlag,
@@ -48,6 +49,27 @@ function parseSalaryGoal(input: string) {
   }
 
   return Math.round(numeric);
+}
+
+function plusDaysDateString(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function formatNextAction(date: string | null, note?: string | null) {
+  if (note?.trim()) {
+    return note.trim();
+  }
+
+  if (!date) {
+    return "Review this role and set your next action.";
+  }
+
+  return `Next action by ${new Intl.DateTimeFormat("en-IN", {
+    day: "numeric",
+    month: "short"
+  }).format(new Date(date))}`;
 }
 
 function mapExperienceLevel(value: string) {
@@ -123,6 +145,17 @@ function buildFallbackDashboard(): DashboardPayload {
   };
 }
 
+function emptyApplicationsBoard(): Record<ApplicationStage, ApplicationCard[]> {
+  return {
+    saved: [],
+    applied: [],
+    screening: [],
+    interview: [],
+    offer: [],
+    rejected: []
+  };
+}
+
 async function getCurrentUserId() {
   if (!supabase) {
     return null;
@@ -155,6 +188,35 @@ function mapJobOpportunity(record: Record<string, unknown>): JobOpportunity {
   };
 }
 
+function buildJobMetadata(job: JobOpportunity) {
+  return {
+    readinessScore: job.readinessScore,
+    matchScore: job.matchScore,
+    missingSkills: job.missingSkills,
+    recommendedActions: job.recommendedActions
+  };
+}
+
+async function ensureJobSaved(userId: string, jobId: string) {
+  if (!supabase) {
+    return;
+  }
+
+  const { error } = await supabase.from("job_saved").upsert(
+    {
+      user_id: userId,
+      job_id: jobId
+    },
+    {
+      onConflict: "user_id,job_id"
+    }
+  );
+
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 export async function getDashboard(): Promise<DashboardPayload> {
   if (!supabase) {
     return dashboardPayload;
@@ -166,7 +228,7 @@ export async function getDashboard(): Promise<DashboardPayload> {
     return dashboardPayload;
   }
 
-  const [goalResult, readinessResult, tasksResult, jobsResult, resumeResult, applicationsResult] =
+  const [goalResult, readinessResult, tasksResult, jobsResult, resumeResult, applicationsResult, savedJobsResult] =
     await Promise.all([
       supabase
         .from("career_goals")
@@ -200,10 +262,19 @@ export async function getDashboard(): Promise<DashboardPayload> {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      supabase.from("applications").select("status").eq("user_id", userId)
+      supabase.from("applications").select("status").eq("user_id", userId),
+      supabase.from("job_saved").select("id").eq("user_id", userId)
     ]);
 
-  if (goalResult.error || readinessResult.error || tasksResult.error || jobsResult.error || resumeResult.error || applicationsResult.error) {
+  if (
+    goalResult.error ||
+    readinessResult.error ||
+    tasksResult.error ||
+    jobsResult.error ||
+    resumeResult.error ||
+    applicationsResult.error ||
+    savedJobsResult.error
+  ) {
     throw new Error(
       goalResult.error?.message ||
         readinessResult.error?.message ||
@@ -211,6 +282,7 @@ export async function getDashboard(): Promise<DashboardPayload> {
         jobsResult.error?.message ||
         resumeResult.error?.message ||
         applicationsResult.error?.message ||
+        savedJobsResult.error?.message ||
         "Unable to load dashboard data."
     );
   }
@@ -237,6 +309,10 @@ export async function getDashboard(): Promise<DashboardPayload> {
       archived: 0
     }
   );
+
+  const activeApplicationCount = (applicationsResult.data ?? []).filter(
+    (item) => item.status !== "saved" && item.status !== "archived"
+  ).length;
 
   const readiness = readinessResult.data;
   const nextBestAction =
@@ -303,8 +379,10 @@ export async function getDashboard(): Promise<DashboardPayload> {
     metrics: [
       {
         label: "Saved jobs",
-        value: String(appCounts.saved),
-        note: "Stored inside your career CRM"
+        value: String((savedJobsResult.data ?? []).length),
+        note: (savedJobsResult.data ?? []).length
+          ? "Shortlisted from job discovery"
+          : "Save roles you want to revisit"
       },
       {
         label: "Active roadmap",
@@ -313,7 +391,7 @@ export async function getDashboard(): Promise<DashboardPayload> {
       },
       {
         label: "Applications",
-        value: String((applicationsResult.data ?? []).length),
+        value: String(activeApplicationCount),
         note: appCounts.interview ? `${appCounts.interview} interview stage` : "No active interview stages yet"
       },
       {
@@ -364,11 +442,147 @@ export async function getLinkedInSuggestions(): Promise<string[]> {
 }
 
 export async function getApplications() {
-  return applications;
+  if (!supabase) {
+    return applications;
+  }
+
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return applications;
+  }
+
+  const { data, error } = await supabase
+    .from("applications")
+    .select("id, company, role, status, next_action_date, stage_name, notes, created_at")
+    .eq("user_id", userId)
+    .neq("status", "archived")
+    .order("position_order", { ascending: true })
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const grouped = emptyApplicationsBoard();
+
+  for (const item of data ?? []) {
+    const status = item.status as ApplicationStage;
+
+    if (!(status in grouped)) {
+      continue;
+    }
+
+    grouped[status].push({
+      id: item.id,
+      company: item.company,
+      role: item.role,
+      status,
+      nextAction: formatNextAction(item.next_action_date, item.notes ?? item.stage_name)
+    });
+  }
+
+  return grouped;
 }
 
 export async function getFeatureFlags(): Promise<FeatureFlag[]> {
   return featureFlags;
+}
+
+export async function saveJob(job: JobOpportunity) {
+  if (!supabase) {
+    return { source: "mock" as const };
+  }
+
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    throw new Error("Sign in to save jobs.");
+  }
+
+  await ensureJobSaved(userId, job.id);
+
+  return { source: "supabase" as const };
+}
+
+export async function trackJob(job: JobOpportunity) {
+  if (!supabase) {
+    return { source: "mock" as const };
+  }
+
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    throw new Error("Sign in to track jobs.");
+  }
+
+  await ensureJobSaved(userId, job.id);
+
+  const { data: existing, error: existingError } = await supabase
+    .from("applications")
+    .select("id, next_action_date")
+    .eq("user_id", userId)
+    .eq("job_id", job.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingError) {
+    throw new Error(existingError.message);
+  }
+
+  const nextActionDate = plusDaysDateString(3);
+
+  if (existing?.id) {
+    if (!existing.next_action_date) {
+      const { error } = await supabase
+        .from("applications")
+        .update({
+          next_action_date: nextActionDate,
+          notes: "Review fit and decide whether to apply this week."
+        })
+        .eq("id", existing.id);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    }
+
+    return {
+      source: "supabase" as const,
+      nextActionDate
+    };
+  }
+
+  const { error } = await supabase.from("applications").insert({
+    user_id: userId,
+    job_id: job.id,
+    company: job.company,
+    role: job.roleTitle,
+    status: "saved",
+    source: "job_discovery",
+    salary_range: job.salaryRange,
+    next_action_date: nextActionDate,
+    stage_name: "Saved",
+    notes: "Review fit and decide whether to apply this week.",
+    metadata: buildJobMetadata(job)
+  });
+
+  if (error) {
+    if ("code" in error && error.code === "23505") {
+      return {
+        source: "supabase" as const,
+        nextActionDate
+      };
+    }
+
+    throw new Error(error.message);
+  }
+
+  return {
+    source: "supabase" as const,
+    nextActionDate
+  };
 }
 
 export async function submitOnboarding(input: OnboardingInput): Promise<OnboardingResult> {
