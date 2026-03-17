@@ -17,6 +17,9 @@ import {
   type JobOpportunity,
   type OnboardingInput,
   type OnboardingResult,
+  type PrepTask,
+  type PrepPlanPayload,
+  type ResourceRecommendation,
   type ResumeSuggestion
 } from "@/lib/types";
 
@@ -217,6 +220,23 @@ async function ensureJobSaved(userId: string, jobId: string) {
   }
 }
 
+function mapResourceRecommendation(record: Record<string, unknown>): ResourceRecommendation {
+  const durationMinutes = Number(record.duration_minutes ?? 0);
+  const skillTags = Array.isArray(record.skill_tags)
+    ? record.skill_tags.map((value) => String(value))
+    : [];
+
+  return {
+    id: String(record.id ?? ""),
+    title: String(record.title ?? ""),
+    source: String(record.provider ?? record.source ?? "Resource"),
+    duration: durationMinutes > 0 ? `${durationMinutes} min` : "Flexible",
+    difficulty: String(record.difficulty ?? "All levels"),
+    skillTag: skillTags[0] ?? "Readiness",
+    url: String(record.url ?? "")
+  };
+}
+
 export async function getDashboard(): Promise<DashboardPayload> {
   if (!supabase) {
     return dashboardPayload;
@@ -228,7 +248,7 @@ export async function getDashboard(): Promise<DashboardPayload> {
     return dashboardPayload;
   }
 
-  const [goalResult, readinessResult, tasksResult, jobsResult, resumeResult, applicationsResult, savedJobsResult] =
+  const [goalResult, readinessResult, tasksResult, jobsResult, resumeResult, applicationsResult, savedJobsResult, resourcesResult] =
     await Promise.all([
       supabase
         .from("career_goals")
@@ -263,7 +283,13 @@ export async function getDashboard(): Promise<DashboardPayload> {
         .limit(1)
         .maybeSingle(),
       supabase.from("applications").select("status").eq("user_id", userId),
-      supabase.from("job_saved").select("id").eq("user_id", userId)
+      supabase.from("job_saved").select("id").eq("user_id", userId),
+      supabase
+        .from("learning_resources")
+        .select("id, title, provider, url, skill_tags, difficulty, duration_minutes, ranking_score")
+        .eq("is_active", true)
+        .order("ranking_score", { ascending: false })
+        .limit(12)
     ]);
 
   if (
@@ -273,7 +299,8 @@ export async function getDashboard(): Promise<DashboardPayload> {
     jobsResult.error ||
     resumeResult.error ||
     applicationsResult.error ||
-    savedJobsResult.error
+    savedJobsResult.error ||
+    resourcesResult.error
   ) {
     throw new Error(
       goalResult.error?.message ||
@@ -283,6 +310,7 @@ export async function getDashboard(): Promise<DashboardPayload> {
         resumeResult.error?.message ||
         applicationsResult.error?.message ||
         savedJobsResult.error?.message ||
+        resourcesResult.error?.message ||
         "Unable to load dashboard data."
     );
   }
@@ -327,6 +355,16 @@ export async function getDashboard(): Promise<DashboardPayload> {
   const topJobs = Array.isArray(jobsResult.data)
     ? jobsResult.data.map((item) => mapJobOpportunity(item as Record<string, unknown>))
     : [];
+
+  const topGapSet = new Set((readiness.top_gaps ?? []).map((item: string) => item.trim().toLowerCase()));
+  const matchedResources = (resourcesResult.data ?? []).filter((resource) => {
+    const skillTags = Array.isArray(resource.skill_tags) ? resource.skill_tags : [];
+    return skillTags.some((skill) => topGapSet.has(String(skill).trim().toLowerCase()));
+  });
+
+  const recommendedResources = (matchedResources.length ? matchedResources : resourcesResult.data ?? [])
+    .slice(0, 3)
+    .map((item) => mapResourceRecommendation(item as Record<string, unknown>));
 
   const experienceLevelLabel =
     goalResult.data.experience_level === "entry"
@@ -375,7 +413,7 @@ export async function getDashboard(): Promise<DashboardPayload> {
       skillTag: task.skill_tags?.[0] ?? "Readiness"
     })),
     topJobs,
-    resources: dashboardPayload.resources,
+    resources: recommendedResources.length ? recommendedResources : dashboardPayload.resources,
     metrics: [
       {
         label: "Saved jobs",
@@ -441,6 +479,118 @@ export async function getLinkedInSuggestions(): Promise<string[]> {
   return linkedinSuggestions;
 }
 
+export async function getPrepPlan(): Promise<PrepPlanPayload> {
+  if (!supabase) {
+    return {
+      roadmap: {
+        id: "mock-roadmap",
+        role: dashboardPayload.goal.targetRole,
+        company: dashboardPayload.goal.targetCompany,
+        durationDays: 14,
+        startDate: null,
+        endDate: null
+      },
+      tasks: dashboardPayload.todayTasks,
+      resources: dashboardPayload.resources,
+      focusSkills: dashboardPayload.readiness.topGaps
+    };
+  }
+
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return {
+      roadmap: null,
+      tasks: [],
+      resources: dashboardPayload.resources,
+      focusSkills: []
+    };
+  }
+
+  const [roadmapResult, readinessResult, resourcesResult] = await Promise.all([
+    supabase
+      .from("prep_roadmaps")
+      .select("id, role, company, duration_days, start_date, end_date")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("readiness_snapshots")
+      .select("top_gaps")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("learning_resources")
+      .select("id, title, provider, url, skill_tags, difficulty, duration_minutes, ranking_score")
+      .eq("is_active", true)
+      .order("ranking_score", { ascending: false })
+      .limit(12)
+  ]);
+
+  if (roadmapResult.error || readinessResult.error || resourcesResult.error) {
+    throw new Error(
+      roadmapResult.error?.message ||
+        readinessResult.error?.message ||
+        resourcesResult.error?.message ||
+        "Unable to load prep plan."
+    );
+  }
+
+  const taskRows = roadmapResult.data?.id
+    ? await supabase
+        .from("prep_tasks")
+        .select("id, title, description, task_type, skill_tags, duration_minutes, status")
+        .eq("roadmap_id", roadmapResult.data.id)
+        .order("day_number", { ascending: true })
+        .order("sort_order", { ascending: true })
+    : { data: [], error: null };
+
+  if (taskRows.error) {
+    throw new Error(taskRows.error.message);
+  }
+
+  const tasks: PrepTask[] = (taskRows.data ?? []).map((task) => ({
+    id: task.id,
+    title: task.title,
+    description: task.description ?? "",
+    type: task.task_type,
+    duration: task.duration_minutes ? `${task.duration_minutes} min` : "Flexible",
+    status: task.status === "done" ? "done" : task.status === "in_progress" ? "in_progress" : "todo",
+    skillTag: task.skill_tags?.[0] ?? "Readiness"
+  }));
+
+  const focusSkills = tasks.length
+    ? Array.from(new Set(tasks.map((task) => task.skillTag))).slice(0, 4)
+    : (readinessResult.data?.top_gaps ?? []).slice(0, 4);
+
+  const focusSkillSet = new Set(focusSkills.map((item: string) => item.trim().toLowerCase()));
+  const matchedResources = (resourcesResult.data ?? []).filter((resource) => {
+    const skillTags = Array.isArray(resource.skill_tags) ? resource.skill_tags : [];
+    return skillTags.some((skill) => focusSkillSet.has(String(skill).trim().toLowerCase()));
+  });
+
+  return {
+    roadmap: roadmapResult.data
+      ? {
+          id: roadmapResult.data.id,
+          role: roadmapResult.data.role ?? "Target role",
+          company: roadmapResult.data.company ?? "Target company",
+          durationDays: roadmapResult.data.duration_days ?? 14,
+          startDate: roadmapResult.data.start_date ?? null,
+          endDate: roadmapResult.data.end_date ?? null
+        }
+      : null,
+    tasks,
+    resources: (matchedResources.length ? matchedResources : resourcesResult.data ?? [])
+      .slice(0, 6)
+      .map((item) => mapResourceRecommendation(item as Record<string, unknown>)),
+    focusSkills
+  };
+}
+
 export async function getApplications() {
   if (!supabase) {
     return applications;
@@ -487,6 +637,67 @@ export async function getApplications() {
 
 export async function getFeatureFlags(): Promise<FeatureFlag[]> {
   return featureFlags;
+}
+
+export async function generatePrepRoadmap(jobId?: string) {
+  if (!supabase) {
+    return {
+      source: "mock" as const,
+      taskCount: dashboardPayload.todayTasks.length
+    };
+  }
+
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    throw new Error("Sign in to generate a prep roadmap.");
+  }
+
+  const { data, error } = await supabase.rpc("generate_prep_roadmap", {
+    p_job_id: jobId ?? null
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const payload = data as {
+    taskCount?: number;
+  } | null;
+
+  return {
+    source: "supabase" as const,
+    taskCount: Number(payload?.taskCount ?? 0)
+  };
+}
+
+export async function updatePrepTaskStatus(taskId: string, status: "todo" | "in_progress" | "done") {
+  if (!supabase) {
+    return { source: "mock" as const };
+  }
+
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    throw new Error("Sign in to update prep tasks.");
+  }
+
+  const { error } = await supabase
+    .from("prep_tasks")
+    .update({
+      status,
+      completed_at: status === "done" ? new Date().toISOString() : null
+    })
+    .eq("id", taskId)
+    .eq("user_id", userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  await supabase.rpc("refresh_readiness_snapshot");
+
+  return { source: "supabase" as const };
 }
 
 export async function saveJob(job: JobOpportunity) {

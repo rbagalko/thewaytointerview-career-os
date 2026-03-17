@@ -776,6 +776,11 @@ button {
   font-weight: 600;
 }
 
+.inline-link {
+  color: var(--brand);
+  font-weight: 700;
+}
+
 @media (max-width: 1440px) {
   .app-shell {
     grid-template-columns: 244px minmax(0, 1fr);

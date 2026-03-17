@@ -54,6 +54,7 @@ export interface ResourceRecommendation {
   duration: string;
   difficulty: string;
   skillTag: string;
+  url?: string;
 }
 
 export interface JDAnalysis {
@@ -102,6 +103,20 @@ export interface DashboardPayload {
     value: string;
     note: string;
   }[];
+}
+
+export interface PrepPlanPayload {
+  roadmap: {
+    id: string;
+    role: string;
+    company: string;
+    durationDays: number;
+    startDate: string | null;
+    endDate: string | null;
+  } | null;
+  tasks: PrepTask[];
+  resources: ResourceRecommendation[];
+  focusSkills: string[];
 }
 
 export interface OnboardingInput {

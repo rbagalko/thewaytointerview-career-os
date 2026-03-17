@@ -6,10 +6,13 @@ import {
   getJDAnalysis,
   getJobs,
   getLinkedInSuggestions,
+  getPrepPlan,
   getResumeSuggestions,
+  generatePrepRoadmap,
   saveJob,
   submitOnboarding,
-  trackJob
+  trackJob,
+  updatePrepTaskStatus
 } from "@/lib/api/repository";
 import { type JobOpportunity, type OnboardingInput } from "@/lib/types";
 
@@ -41,6 +44,13 @@ export function useResumeSuggestionsQuery() {
   });
 }
 
+export function usePrepPlanQuery() {
+  return useQuery({
+    queryKey: ["prep-plan"],
+    queryFn: getPrepPlan
+  });
+}
+
 export function useLinkedInSuggestionsQuery() {
   return useQuery({
     queryKey: ["linkedin-suggestions"],
@@ -66,7 +76,8 @@ function invalidateCareerQueries(queryClient: ReturnType<typeof useQueryClient>)
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
     queryClient.invalidateQueries({ queryKey: ["jobs"] }),
-    queryClient.invalidateQueries({ queryKey: ["applications"] })
+    queryClient.invalidateQueries({ queryKey: ["applications"] }),
+    queryClient.invalidateQueries({ queryKey: ["prep-plan"] })
   ]);
 }
 
@@ -97,6 +108,29 @@ export function useTrackJobMutation() {
 
   return useMutation({
     mutationFn: (job: JobOpportunity) => trackJob(job),
+    onSuccess: async () => {
+      await invalidateCareerQueries(queryClient);
+    }
+  });
+}
+
+export function useGeneratePrepRoadmapMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (jobId?: string) => generatePrepRoadmap(jobId),
+    onSuccess: async () => {
+      await invalidateCareerQueries(queryClient);
+    }
+  });
+}
+
+export function usePrepTaskStatusMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ taskId, status }: { taskId: string; status: "todo" | "in_progress" | "done" }) =>
+      updatePrepTaskStatus(taskId, status),
     onSuccess: async () => {
       await invalidateCareerQueries(queryClient);
     }
