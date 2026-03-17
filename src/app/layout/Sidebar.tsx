@@ -2,7 +2,12 @@ import { LogOut } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/app/auth/AuthProvider";
 import { Button } from "@/components/Button";
-import { mainNavigation, secondaryNavigation } from "@/app/layout/navigation";
+import {
+  analysisNavigation,
+  finalNavigation,
+  preparationNavigation,
+  type AppNavigationItem
+} from "@/app/layout/navigation";
 import { env } from "@/lib/env";
 
 function NavigationGroup({
@@ -10,7 +15,7 @@ function NavigationGroup({
   items
 }: {
   label: string;
-  items: typeof mainNavigation;
+  items: AppNavigationItem[];
 }) {
   return (
     <section className="nav-group">
@@ -44,8 +49,9 @@ export function Sidebar() {
           Skill gap, learning, proof of work, applications, and interview prep in one cockpit.
         </p>
       </div>
-      <NavigationGroup label="Operate" items={mainNavigation} />
-      <NavigationGroup label="Setup" items={secondaryNavigation} />
+      <NavigationGroup label="Preparation Tools" items={preparationNavigation} />
+      <NavigationGroup label="Track & Analyze" items={analysisNavigation} />
+      <NavigationGroup label="Final Feature" items={finalNavigation} />
       {isConfigured && user ? (
         <div className="insight-block" style={{ marginTop: "auto" }}>
           <h3>Signed in</h3>

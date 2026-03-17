@@ -28,12 +28,20 @@ const ResumePage = lazy(async () => ({
   default: (await import("@/app/pages/ResumePage")).ResumePage
 }));
 
+const SkillGapPage = lazy(async () => ({
+  default: (await import("@/app/pages/SkillGapPage")).SkillGapPage
+}));
+
 const LinkedInPage = lazy(async () => ({
   default: (await import("@/app/pages/LinkedInPage")).LinkedInPage
 }));
 
 const JDAnalyzerPage = lazy(async () => ({
   default: (await import("@/app/pages/JDAnalyzerPage")).JDAnalyzerPage
+}));
+
+const InterviewPracticePage = lazy(async () => ({
+  default: (await import("@/app/pages/InterviewPracticePage")).InterviewPracticePage
 }));
 
 const ApplicationsPage = lazy(async () => ({
@@ -69,8 +77,10 @@ export const router = createBrowserRouter([
           { path: "jobs", element: suspense(<JobsPage />) },
           { path: "prep", element: suspense(<PrepPage />) },
           { path: "resume", element: suspense(<ResumePage />) },
+          { path: "skill-gap", element: suspense(<SkillGapPage />) },
           { path: "linkedin", element: suspense(<LinkedInPage />) },
           { path: "jd", element: suspense(<JDAnalyzerPage />) },
+          { path: "interview-practice", element: suspense(<InterviewPracticePage />) },
           { path: "tracker", element: suspense(<ApplicationsPage />) },
           { path: "onboarding", element: suspense(<OnboardingPage />) }
         ]

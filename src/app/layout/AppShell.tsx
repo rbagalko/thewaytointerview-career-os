@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { InsightsPanel } from "@/app/layout/InsightsPanel";
+import { mobileNavigation } from "@/app/layout/navigation";
 import { Sidebar } from "@/app/layout/Sidebar";
-import { mainNavigation } from "@/app/layout/navigation";
 
 export function AppShell() {
   return (
@@ -9,7 +9,7 @@ export function AppShell() {
       <Sidebar />
       <div className="main-surface">
         <nav className="mobile-nav" aria-label="Primary navigation">
-          {mainNavigation.map((item) => (
+          {mobileNavigation.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -26,4 +26,3 @@ export function AppShell() {
     </div>
   );
 }
-
