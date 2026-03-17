@@ -57,9 +57,9 @@ export function Sidebar() {
         </div>
       ) : null}
       <div className="footer-note">
-        March 19 launch scaffold.
+        Live Career OS workspace.
         <br />
-        React app shell plus Supabase migration set.
+        Supabase-backed product with Cloudflare deployment.
       </div>
     </aside>
   );

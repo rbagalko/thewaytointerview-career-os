@@ -87,7 +87,7 @@ export function OnboardingPage() {
         <SectionHeader
           eyebrow="Smooth onboarding"
           title="Build the user's career cockpit in under three minutes"
-          copy="When Supabase credentials are present, this form now writes career goals and skills into the database, then creates a fresh readiness snapshot."
+          copy="This form writes career goals and skills into Supabase, then creates a fresh readiness snapshot for the dashboard, jobs, and prep engine."
         />
       </Panel>
 
@@ -179,7 +179,7 @@ export function OnboardingPage() {
         </Panel>
 
         <Panel>
-          <SectionHeader title="Outcome preview" copy="This panel now updates from the real onboarding response when Supabase is configured." />
+          <SectionHeader title="Outcome preview" copy="This panel updates from the live onboarding response so the user sees their baseline before they leave the page." />
           <div className="list-stack">
             <div className="split-list-item">
               <strong>Readiness</strong>

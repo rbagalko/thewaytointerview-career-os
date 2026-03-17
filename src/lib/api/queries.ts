@@ -1,12 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  analyzeJD,
+  analyzeLinkedInProfile,
   analyzeResume,
   getApplications,
   getDashboard,
   getFeatureFlags,
   getJDAnalysis,
   getJobs,
-  getLinkedInSuggestions,
+  getLinkedInWorkspace,
   getPrepPlan,
   getResumeWorkspace,
   getResumeSuggestions,
@@ -32,10 +34,10 @@ export function useJobsQuery(query: string, readinessMin: number) {
   });
 }
 
-export function useJDAnalysisQuery() {
+export function useJDAnalysisQuery(jobId?: string) {
   return useQuery({
-    queryKey: ["jd-analysis"],
-    queryFn: getJDAnalysis
+    queryKey: ["jd-analysis", jobId ?? "latest"],
+    queryFn: () => getJDAnalysis(jobId)
   });
 }
 
@@ -60,10 +62,10 @@ export function useResumeWorkspaceQuery() {
   });
 }
 
-export function useLinkedInSuggestionsQuery() {
+export function useLinkedInWorkspaceQuery() {
   return useQuery({
-    queryKey: ["linkedin-suggestions"],
-    queryFn: getLinkedInSuggestions
+    queryKey: ["linkedin-workspace"],
+    queryFn: getLinkedInWorkspace
   });
 }
 
@@ -87,7 +89,10 @@ function invalidateCareerQueries(queryClient: ReturnType<typeof useQueryClient>)
     queryClient.invalidateQueries({ queryKey: ["jobs"] }),
     queryClient.invalidateQueries({ queryKey: ["applications"] }),
     queryClient.invalidateQueries({ queryKey: ["prep-plan"] }),
-    queryClient.invalidateQueries({ queryKey: ["resume-workspace"] })
+    queryClient.invalidateQueries({ queryKey: ["resume-workspace"] }),
+    queryClient.invalidateQueries({ queryKey: ["jd-analysis"] }),
+    queryClient.invalidateQueries({ queryKey: ["linkedin-workspace"] }),
+    queryClient.invalidateQueries({ queryKey: ["feature-flags"] })
   ]);
 }
 
@@ -142,6 +147,39 @@ export function usePrepTaskStatusMutation() {
     mutationFn: ({ taskId, status }: { taskId: string; status: "todo" | "in_progress" | "done" }) =>
       updatePrepTaskStatus(taskId, status),
     onSuccess: async () => {
+      await invalidateCareerQueries(queryClient);
+    }
+  });
+}
+
+export function useAnalyzeJDMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ rawText, jobId }: { rawText: string; jobId?: string }) =>
+      analyzeJD(rawText, jobId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["jd-analysis"] });
+      await invalidateCareerQueries(queryClient);
+    }
+  });
+}
+
+export function useAnalyzeLinkedInMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      profileName,
+      headline,
+      summary
+    }: {
+      profileName: string;
+      headline: string;
+      summary: string;
+    }) => analyzeLinkedInProfile({ profileName, headline, summary }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["linkedin-workspace"] });
       await invalidateCareerQueries(queryClient);
     }
   });

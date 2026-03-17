@@ -58,10 +58,15 @@ export interface ResourceRecommendation {
 }
 
 export interface JDAnalysis {
+  analysisId?: string;
   summary: string;
   keySkills: string[];
   criticalGaps: { skill: string; importance: string; note: string }[];
   interviewRounds: { name: string; focus: string[] }[];
+  role?: string;
+  company?: string;
+  rawText?: string;
+  hasAnalysis?: boolean;
 }
 
 export interface ResumeSuggestion {
@@ -74,6 +79,18 @@ export interface ResumeWorkspacePayload {
   atsScore: number | null;
   keywordGaps: string[];
   suggestions: ResumeSuggestion[];
+  targetRole: string;
+  targetCompany: string;
+}
+
+export interface LinkedInWorkspacePayload {
+  profileName: string;
+  headline: string;
+  summary: string;
+  suggestedHeadline: string;
+  suggestedSummary: string;
+  keywordGaps: string[];
+  profileScore: number | null;
   targetRole: string;
   targetCompany: string;
 }

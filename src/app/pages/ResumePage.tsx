@@ -168,7 +168,7 @@ export function ResumePage() {
       <Panel>
         <SectionHeader
           title="Suggested rewrites"
-          copy="These are now generated from the latest stored resume analysis instead of staying purely mock."
+          copy="These rewrites are generated from the latest stored resume analysis and kept ready for export."
         />
         <div className="list-stack">
           {data.suggestions.length ? (

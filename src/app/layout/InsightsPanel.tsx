@@ -69,10 +69,10 @@ export function InsightsPanel() {
       <div className="insight-block">
         <h3>
           <Flag size={16} style={{ verticalAlign: "text-bottom", marginRight: 8 }} />
-          Launch note
+          Product status
         </h3>
         <p className="muted-copy">
-          This scaffold runs with mock data until Supabase credentials and edge functions are wired.
+          Your dashboard, jobs, CRM, prep, resume, JD analysis, and LinkedIn modules now run on live Supabase data.
         </p>
       </div>
     </aside>

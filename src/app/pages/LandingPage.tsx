@@ -11,7 +11,7 @@ export function LandingPage() {
           <Panel className="hero-panel">
             <div className="hero-grid">
               <div className="page">
-                <Badge tone="gold">March 19 launch scaffold</Badge>
+                <Badge tone="gold">Live production pilot</Badge>
                 <h1 className="page-title">
                   TheWayToInterview becomes your AI career operating system.
                 </h1>

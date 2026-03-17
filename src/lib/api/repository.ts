@@ -4,7 +4,6 @@ import {
   featureFlags,
   jdAnalysis,
   jobs,
-  linkedinSuggestions,
   resumeSuggestions
 } from "@/lib/mock-data";
 import { supabase } from "@/lib/supabase";
@@ -15,6 +14,7 @@ import {
   type FeatureFlag,
   type JDAnalysis,
   type JobOpportunity,
+  type LinkedInWorkspacePayload,
   type OnboardingInput,
   type OnboardingResult,
   type PrepTask,
@@ -198,6 +198,56 @@ function buildJobMetadata(job: JobOpportunity) {
     matchScore: job.matchScore,
     missingSkills: job.missingSkills,
     recommendedActions: job.recommendedActions
+  };
+}
+
+function buildEmptyJDAnalysis(role = "", company = "", rawText = ""): JDAnalysis {
+  return {
+    analysisId: undefined,
+    summary: "",
+    keySkills: [],
+    criticalGaps: [],
+    interviewRounds: [],
+    role,
+    company,
+    rawText,
+    hasAnalysis: false
+  };
+}
+
+function buildSuggestedHeadline(targetRole: string, skills: string[]) {
+  const baseRole = targetRole.trim() || "Identity Engineer";
+  const focus = skills.filter(Boolean).slice(0, 3);
+
+  return focus.length ? `${baseRole} | ${focus.join(" | ")}` : baseRole;
+}
+
+function buildSuggestedLinkedInSummary(targetRole: string, targetCompany: string, skills: string[]) {
+  const focus = skills.filter(Boolean).slice(0, 4).join(", ");
+  const role = targetRole.trim() || "identity-focused infrastructure";
+  const companyNote = targetCompany.trim() ? ` aligned to roles like ${targetCompany.trim()}` : "";
+
+  return `I build toward ${role} opportunities${companyNote} with hands-on work across ${focus || "identity operations, troubleshooting, and automation"}. I focus on translating security and platform requirements into reliable implementation, clear stakeholder communication, and proof-of-work that shows how I solve real access, policy, and automation problems.`;
+}
+
+function buildFallbackLinkedInWorkspace(): LinkedInWorkspacePayload {
+  const fallbackSkills = ["Azure AD", "Conditional Access", "PowerShell", "Identity Automation"];
+
+  return {
+    profileName: "",
+    headline: "Azure AD Engineer | Identity Operations | PowerShell",
+    summary:
+      "Identity-focused engineer building toward cloud IAM roles with practical work across Azure AD, access policy design, and automation.",
+    suggestedHeadline: buildSuggestedHeadline(dashboardPayload.goal.targetRole, fallbackSkills),
+    suggestedSummary: buildSuggestedLinkedInSummary(
+      dashboardPayload.goal.targetRole,
+      dashboardPayload.goal.targetCompany,
+      fallbackSkills
+    ),
+    keywordGaps: ["Conditional Access", "Graph API", "Proof of work"],
+    profileScore: 72,
+    targetRole: dashboardPayload.goal.targetRole,
+    targetCompany: dashboardPayload.goal.targetCompany
   };
 }
 
@@ -468,8 +518,115 @@ export async function getJobs(query = "", readinessMin = 0): Promise<JobOpportun
     : [];
 }
 
-export async function getJDAnalysis(): Promise<JDAnalysis> {
-  return jdAnalysis;
+export async function getJDAnalysis(jobId?: string): Promise<JDAnalysis> {
+  const fallback: JDAnalysis = {
+    ...jdAnalysis,
+    role: dashboardPayload.goal.targetRole,
+    company: dashboardPayload.goal.targetCompany,
+    rawText: "",
+    hasAnalysis: true
+  };
+
+  if (!supabase) {
+    return fallback;
+  }
+
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return fallback;
+  }
+
+  const [jobResult, latestAnalysisResult] = await Promise.all([
+    jobId
+      ? supabase
+          .from("jobs")
+          .select("id, company, role_title, description_raw, description_normalized")
+          .eq("id", jobId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    jobId
+      ? supabase
+          .from("jd_analyses")
+          .select("id, job_id, company, role, summary, key_skills, rounds, raw_jd, created_at")
+          .eq("user_id", userId)
+          .eq("job_id", jobId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : supabase
+          .from("jd_analyses")
+          .select("id, job_id, company, role, summary, key_skills, rounds, raw_jd, created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+  ]);
+
+  if (jobResult.error || latestAnalysisResult.error) {
+    throw new Error(jobResult.error?.message || latestAnalysisResult.error?.message || "Unable to load JD analysis.");
+  }
+
+  if (!latestAnalysisResult.data) {
+    return buildEmptyJDAnalysis(
+      jobResult.data?.role_title ?? "",
+      jobResult.data?.company ?? "",
+      jobResult.data?.description_normalized ?? jobResult.data?.description_raw ?? ""
+    );
+  }
+
+  const gapResult = await supabase
+    .from("skill_gaps")
+    .select("skill_name, importance")
+    .eq("jd_analysis_id", latestAnalysisResult.data.id)
+    .order("gap_score", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (gapResult.error) {
+    throw new Error(gapResult.error.message);
+  }
+
+  const rounds = Array.isArray(latestAnalysisResult.data.rounds)
+    ? latestAnalysisResult.data.rounds
+        .map((item) => {
+          if (!item || typeof item !== "object") {
+            return null;
+          }
+
+          const round = item as {
+            name?: unknown;
+            focus?: unknown;
+          };
+
+          return {
+            name: String(round.name ?? "Interview round"),
+            focus: Array.isArray(round.focus)
+              ? round.focus.map((topic) => String(topic))
+              : []
+          };
+        })
+        .filter((item): item is { name: string; focus: string[] } => Boolean(item))
+    : [];
+
+  return {
+    analysisId: latestAnalysisResult.data.id,
+    summary: latestAnalysisResult.data.summary ?? "",
+    keySkills: latestAnalysisResult.data.key_skills ?? [],
+    criticalGaps: (gapResult.data ?? []).map((gap) => ({
+      skill: gap.skill_name,
+      importance: gap.importance ? `${gap.importance.charAt(0).toUpperCase()}${gap.importance.slice(1)}` : "Medium",
+      note: "This skill appears central to the job signal and needs concrete examples in interviews."
+    })),
+    interviewRounds: rounds,
+    role: latestAnalysisResult.data.role ?? jobResult.data?.role_title ?? "",
+    company: latestAnalysisResult.data.company ?? jobResult.data?.company ?? "",
+    rawText:
+      latestAnalysisResult.data.raw_jd?.trim() ||
+      jobResult.data?.description_normalized ||
+      jobResult.data?.description_raw ||
+      "",
+    hasAnalysis: true
+  };
 }
 
 export async function getResumeWorkspace(): Promise<ResumeWorkspacePayload> {
@@ -569,8 +726,81 @@ export async function getResumeSuggestions(): Promise<ResumeSuggestion[]> {
   return resumeSuggestions;
 }
 
-export async function getLinkedInSuggestions(): Promise<string[]> {
-  return linkedinSuggestions;
+export async function getLinkedInWorkspace(): Promise<LinkedInWorkspacePayload> {
+  if (!supabase) {
+    return buildFallbackLinkedInWorkspace();
+  }
+
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return buildFallbackLinkedInWorkspace();
+  }
+
+  const [goalResult, profileResult, latestResult, accountResult] = await Promise.all([
+    supabase
+      .from("career_goals")
+      .select("target_role, target_company")
+      .eq("user_id", userId)
+      .maybeSingle(),
+    supabase
+      .from("candidate_profiles")
+      .select("current_title, summary, skills, tools")
+      .eq("user_id", userId)
+      .maybeSingle(),
+    supabase
+      .from("linkedin_optimizations")
+      .select(
+        "profile_name, profile_headline, profile_summary, suggested_headline, suggested_summary, keyword_gaps, profile_score"
+      )
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", userId)
+      .maybeSingle()
+  ]);
+
+  if (goalResult.error || profileResult.error || latestResult.error || accountResult.error) {
+    throw new Error(
+      goalResult.error?.message ||
+        profileResult.error?.message ||
+        latestResult.error?.message ||
+        accountResult.error?.message ||
+        "Unable to load LinkedIn workspace."
+    );
+  }
+
+  const targetRole = goalResult.data?.target_role ?? dashboardPayload.goal.targetRole;
+  const targetCompany = goalResult.data?.target_company ?? dashboardPayload.goal.targetCompany;
+  const focusSkills = Array.from(
+    new Set([...(profileResult.data?.skills ?? []), ...(profileResult.data?.tools ?? [])].filter(Boolean))
+  ).slice(0, 5);
+
+  return {
+    profileName: latestResult.data?.profile_name ?? accountResult.data?.full_name ?? "",
+    headline:
+      latestResult.data?.profile_headline ??
+      profileResult.data?.current_title ??
+      targetRole,
+    summary: latestResult.data?.profile_summary ?? profileResult.data?.summary ?? "",
+    suggestedHeadline:
+      latestResult.data?.suggested_headline ??
+      buildSuggestedHeadline(targetRole, focusSkills),
+    suggestedSummary:
+      latestResult.data?.suggested_summary ??
+      buildSuggestedLinkedInSummary(targetRole, targetCompany, focusSkills),
+    keywordGaps:
+      latestResult.data?.keyword_gaps?.length
+        ? latestResult.data.keyword_gaps
+        : focusSkills.slice(0, 4),
+    profileScore: latestResult.data?.profile_score ? Number(latestResult.data.profile_score) : null,
+    targetRole,
+    targetCompany
+  };
 }
 
 export async function getPrepPlan(): Promise<PrepPlanPayload> {
@@ -730,7 +960,106 @@ export async function getApplications() {
 }
 
 export async function getFeatureFlags(): Promise<FeatureFlag[]> {
-  return featureFlags;
+  if (!supabase) {
+    return featureFlags;
+  }
+
+  const { data, error } = await supabase
+    .from("feature_flags")
+    .select("key, label, status, meta")
+    .order("label", { ascending: true });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).map((flag) => {
+    const meta =
+      flag.meta && typeof flag.meta === "object"
+        ? (flag.meta as { description?: unknown })
+        : null;
+
+    return {
+      key: flag.key,
+      label: flag.label,
+      status: flag.status === "active" ? "active" : "disabled",
+      description:
+        typeof meta?.description === "string"
+          ? meta.description
+          : "Soon you can experience this."
+    };
+  });
+}
+
+export async function analyzeJD(rawText: string, jobId?: string) {
+  if (!supabase) {
+    return {
+      source: "mock" as const,
+      analysisId: "mock-analysis"
+    };
+  }
+
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    throw new Error("Sign in to analyze a job description.");
+  }
+
+  const { data, error } = await supabase.rpc("analyze_jd", {
+    p_raw_jd: rawText,
+    p_job_id: jobId ?? null
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const payload = data as {
+    analysisId?: string;
+  } | null;
+
+  return {
+    source: "supabase" as const,
+    analysisId: String(payload?.analysisId ?? "")
+  };
+}
+
+export async function analyzeLinkedInProfile(input: {
+  profileName: string;
+  headline: string;
+  summary: string;
+}) {
+  if (!supabase) {
+    return {
+      source: "mock" as const,
+      profileScore: buildFallbackLinkedInWorkspace().profileScore ?? 0
+    };
+  }
+
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    throw new Error("Sign in to optimize your LinkedIn profile.");
+  }
+
+  const { data, error } = await supabase.rpc("analyze_linkedin_profile", {
+    p_profile_name: input.profileName,
+    p_profile_headline: input.headline,
+    p_profile_summary: input.summary
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const payload = data as {
+    profileScore?: number;
+  } | null;
+
+  return {
+    source: "supabase" as const,
+    profileScore: Number(payload?.profileScore ?? 0)
+  };
 }
 
 export async function analyzeResume(rawText: string, jobId?: string) {
