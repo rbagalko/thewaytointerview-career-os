@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  analyzeResume,
   getApplications,
   getDashboard,
   getFeatureFlags,
@@ -7,6 +8,7 @@ import {
   getJobs,
   getLinkedInSuggestions,
   getPrepPlan,
+  getResumeWorkspace,
   getResumeSuggestions,
   generatePrepRoadmap,
   saveJob,
@@ -51,6 +53,13 @@ export function usePrepPlanQuery() {
   });
 }
 
+export function useResumeWorkspaceQuery() {
+  return useQuery({
+    queryKey: ["resume-workspace"],
+    queryFn: getResumeWorkspace
+  });
+}
+
 export function useLinkedInSuggestionsQuery() {
   return useQuery({
     queryKey: ["linkedin-suggestions"],
@@ -77,7 +86,8 @@ function invalidateCareerQueries(queryClient: ReturnType<typeof useQueryClient>)
     queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
     queryClient.invalidateQueries({ queryKey: ["jobs"] }),
     queryClient.invalidateQueries({ queryKey: ["applications"] }),
-    queryClient.invalidateQueries({ queryKey: ["prep-plan"] })
+    queryClient.invalidateQueries({ queryKey: ["prep-plan"] }),
+    queryClient.invalidateQueries({ queryKey: ["resume-workspace"] })
   ]);
 }
 
@@ -131,6 +141,18 @@ export function usePrepTaskStatusMutation() {
   return useMutation({
     mutationFn: ({ taskId, status }: { taskId: string; status: "todo" | "in_progress" | "done" }) =>
       updatePrepTaskStatus(taskId, status),
+    onSuccess: async () => {
+      await invalidateCareerQueries(queryClient);
+    }
+  });
+}
+
+export function useAnalyzeResumeMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ rawText, jobId }: { rawText: string; jobId?: string }) =>
+      analyzeResume(rawText, jobId),
     onSuccess: async () => {
       await invalidateCareerQueries(queryClient);
     }

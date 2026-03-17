@@ -20,7 +20,8 @@ import {
   type PrepTask,
   type PrepPlanPayload,
   type ResourceRecommendation,
-  type ResumeSuggestion
+  type ResumeSuggestion,
+  type ResumeWorkspacePayload
 } from "@/lib/types";
 
 function filterJobs(items: JobOpportunity[], query: string, readinessMin: number) {
@@ -471,6 +472,99 @@ export async function getJDAnalysis(): Promise<JDAnalysis> {
   return jdAnalysis;
 }
 
+export async function getResumeWorkspace(): Promise<ResumeWorkspacePayload> {
+  if (!supabase) {
+    return {
+      rawText: "",
+      atsScore: 71,
+      keywordGaps: ["Conditional Access", "Graph API", "Zero Trust"],
+      suggestions: resumeSuggestions,
+      targetRole: dashboardPayload.goal.targetRole,
+      targetCompany: dashboardPayload.goal.targetCompany
+    };
+  }
+
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    return {
+      rawText: "",
+      atsScore: null,
+      keywordGaps: [],
+      suggestions: [],
+      targetRole: "Target role",
+      targetCompany: "Target company"
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("resumes")
+    .select("raw_text, ats_score, parsed_sections")
+    .eq("user_id", userId)
+    .order("is_primary", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!data) {
+    return {
+      rawText: "",
+      atsScore: null,
+      keywordGaps: [],
+      suggestions: [],
+      targetRole: dashboardPayload.goal.targetRole,
+      targetCompany: dashboardPayload.goal.targetCompany
+    };
+  }
+
+  const parsedSections =
+    data.parsed_sections && typeof data.parsed_sections === "object"
+      ? (data.parsed_sections as {
+          keywordGaps?: unknown;
+          suggestions?: unknown;
+          targetRole?: unknown;
+          targetCompany?: unknown;
+        })
+      : null;
+
+  const keywordGaps = Array.isArray(parsedSections?.keywordGaps)
+    ? parsedSections?.keywordGaps.map((item) => String(item))
+    : [];
+
+  const suggestions = Array.isArray(parsedSections?.suggestions)
+    ? parsedSections.suggestions
+        .map((item) => {
+          if (!item || typeof item !== "object") {
+            return null;
+          }
+
+          const suggestion = item as {
+            before?: unknown;
+            after?: unknown;
+          };
+
+          return {
+            before: String(suggestion.before ?? ""),
+            after: String(suggestion.after ?? "")
+          };
+        })
+        .filter((item): item is ResumeSuggestion => Boolean(item?.before || item?.after))
+    : [];
+
+  return {
+    rawText: data.raw_text ?? "",
+    atsScore: data.ats_score ? Number(data.ats_score) : null,
+    keywordGaps,
+    suggestions,
+    targetRole: String(parsedSections?.targetRole ?? dashboardPayload.goal.targetRole),
+    targetCompany: String(parsedSections?.targetCompany ?? dashboardPayload.goal.targetCompany)
+  };
+}
+
 export async function getResumeSuggestions(): Promise<ResumeSuggestion[]> {
   return resumeSuggestions;
 }
@@ -637,6 +731,39 @@ export async function getApplications() {
 
 export async function getFeatureFlags(): Promise<FeatureFlag[]> {
   return featureFlags;
+}
+
+export async function analyzeResume(rawText: string, jobId?: string) {
+  if (!supabase) {
+    return {
+      source: "mock" as const,
+      atsScore: 71
+    };
+  }
+
+  const userId = await getCurrentUserId();
+
+  if (!userId) {
+    throw new Error("Sign in to analyze your resume.");
+  }
+
+  const { data, error } = await supabase.rpc("analyze_resume", {
+    p_raw_text: rawText,
+    p_job_id: jobId ?? null
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const payload = data as {
+    atsScore?: number;
+  } | null;
+
+  return {
+    source: "supabase" as const,
+    atsScore: Number(payload?.atsScore ?? 0)
+  };
 }
 
 export async function generatePrepRoadmap(jobId?: string) {

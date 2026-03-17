@@ -69,6 +69,15 @@ export interface ResumeSuggestion {
   after: string;
 }
 
+export interface ResumeWorkspacePayload {
+  rawText: string;
+  atsScore: number | null;
+  keywordGaps: string[];
+  suggestions: ResumeSuggestion[];
+  targetRole: string;
+  targetCompany: string;
+}
+
 export interface ApplicationCard {
   id: string;
   company: string;
