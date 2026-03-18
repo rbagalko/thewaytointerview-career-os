@@ -13,6 +13,7 @@ import {
   type DashboardPayload,
   type FeatureFlag,
   type JDAnalysis,
+  type JDPrepTask,
   type JobOpportunity,
   type LinkedInWorkspacePayload,
   type OnboardingInput,
@@ -208,11 +209,287 @@ function buildEmptyJDAnalysis(role = "", company = "", rawText = ""): JDAnalysis
     keySkills: [],
     criticalGaps: [],
     interviewRounds: [],
+    whatMattersMost: [],
+    employerSignals: [],
+    prep48h: [],
+    prep2Week: [],
+    generalTips: [],
+    confidenceScores: {
+      skillExtraction: 0,
+      roundPrediction: 0,
+      seniority: 0,
+      companyMatch: 0
+    },
     role,
     company,
+    seniority: "",
+    geography: "",
+    jobFamily: "",
+    functionArea: "",
     rawText,
     hasAnalysis: false
   };
+}
+
+function startCase(value: string) {
+  return value
+    .trim()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function parseStringArray(value: unknown) {
+  return Array.isArray(value) ? value.map((item) => String(item).trim()).filter(Boolean) : [];
+}
+
+function clampPercent(value: unknown, fallback: number) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(100, Math.max(0, Math.round(parsed)));
+}
+
+function parseConfidenceScores(value: unknown, fallback = jdAnalysis.confidenceScores) {
+  const record = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+
+  return {
+    skillExtraction: clampPercent(record.skillExtraction ?? record.skill_extraction, fallback.skillExtraction),
+    roundPrediction: clampPercent(record.roundPrediction ?? record.round_prediction, fallback.roundPrediction),
+    seniority: clampPercent(record.seniority, fallback.seniority),
+    companyMatch: clampPercent(record.companyMatch ?? record.company_match, fallback.companyMatch)
+  };
+}
+
+function parseThemeCards(value: unknown, fallbackSkills: string[], role: string) {
+  const parsed = Array.isArray(value)
+    ? value
+        .map((item, index) => {
+          if (!item || typeof item !== "object") {
+            return null;
+          }
+
+          const record = item as Record<string, unknown>;
+
+          return {
+            step: clampPercent(record.step ?? index + 1, index + 1),
+            title: String(record.title ?? record.theme ?? "").trim(),
+            confidence: clampPercent(record.confidence ?? record.score, 80 - index * 6),
+            explanation: String(record.explanation ?? record.note ?? "").trim()
+          };
+        })
+        .filter((item): item is { step: number; title: string; confidence: number; explanation: string } =>
+          Boolean(item?.title)
+        )
+    : [];
+
+  if (parsed.length) {
+    return parsed;
+  }
+
+  return fallbackSkills.slice(0, 5).map((skill, index) => ({
+    step: index + 1,
+    title: skill,
+    confidence: Math.max(62, 92 - index * 6),
+    explanation: `${skill} appears to be one of the clearest interview signals for ${role || "this role"}.`
+  }));
+}
+
+function parseEmployerSignals(value: unknown, keySkills: string[]) {
+  const parsed = Array.isArray(value)
+    ? value
+        .map((item) => {
+          if (!item || typeof item !== "object") {
+            return null;
+          }
+
+          const record = item as Record<string, unknown>;
+
+          return {
+            label: String(record.label ?? record.title ?? "").trim(),
+            explanation: String(record.explanation ?? record.note ?? "").trim(),
+            prepAction: String(record.prepAction ?? record.prep_action ?? "").trim()
+          };
+        })
+        .filter((item): item is { label: string; explanation: string; prepAction: string } => Boolean(item?.label))
+    : [];
+
+  if (parsed.length) {
+    return parsed;
+  }
+
+  return [
+    {
+      label: "Execution over buzzwords",
+      explanation: "The JD rewards candidates who can translate concepts into incidents, decisions, and shipped outcomes.",
+      prepAction: "Prepare one story where you solved a messy real-world problem with measurable impact."
+    },
+    {
+      label: "Technical fluency is expected",
+      explanation: "This role will likely test whether you can speak credibly about the systems behind the work.",
+      prepAction: `Be ready to simplify ${keySkills[0] ?? "the core stack"} in plain English and then go one level deeper.`
+    }
+  ];
+}
+
+function parsePrepTasks(value: unknown, fallbackLabel: string, keySkills: string[]) {
+  const parsed: JDPrepTask[] = [];
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      if (!item || typeof item !== "object") {
+        return;
+      }
+
+      const record = item as Record<string, unknown>;
+      const title = String(record.title ?? "").trim();
+
+      if (!title) {
+        return;
+      }
+
+      parsed.push({
+        step: clampPercent(record.step ?? record.stepNumber ?? index + 1, index + 1),
+        title,
+        duration: String(record.duration ?? "Flexible").trim(),
+        resources: parseStringArray(record.resources ?? record.resourceLabels ?? record.references),
+        note: String(record.note ?? record.description ?? "").trim() || undefined
+      });
+    });
+  }
+
+  if (parsed.length) {
+    return parsed;
+  }
+
+  return keySkills.slice(0, 3).map((skill, index) => ({
+    step: index + 1,
+    title: `${fallbackLabel}: ${skill}`,
+    duration: index === 0 ? "90 min" : index === 1 ? "2 hours" : "45 min",
+    resources: index === 0 ? ["Official docs"] : ["Personal notes", "Practice stories"],
+    note: `Use this step to turn ${skill} into something you can explain clearly in an interview.`
+  }));
+}
+
+function parseInterviewRounds(value: unknown, keySkills: string[]) {
+  const parsed = Array.isArray(value)
+    ? value
+        .map((item, index) => {
+          if (!item || typeof item !== "object") {
+            return null;
+          }
+
+          const record = item as Record<string, unknown>;
+
+          return {
+            step: clampPercent(record.step ?? index + 1, index + 1),
+            name: String(record.name ?? record.title ?? "Interview round").trim(),
+            likelihood: clampPercent(record.likelihood ?? record.probability ?? record.score, 100 - index * 12),
+            gate: Boolean(record.gate ?? (index < 3)),
+            difficulty: String(record.difficulty ?? (index === 0 ? "Easy" : "Medium")).trim(),
+            duration: String(record.duration ?? (index === 0 ? "30 min" : "45 min")).trim(),
+            format: String(record.format ?? (index === 0 ? "Screening" : "Interview")).trim(),
+            description: String(record.description ?? record.note ?? "").trim(),
+            focus: parseStringArray(record.focus)
+          };
+        })
+        .filter(
+          (
+            item
+          ): item is {
+            step: number;
+            name: string;
+            likelihood: number;
+            gate: boolean;
+            difficulty: string;
+            duration: string;
+            format: string;
+            description: string;
+            focus: string[];
+          } => Boolean(item?.name)
+        )
+    : [];
+
+  if (parsed.length) {
+    return parsed;
+  }
+
+  return [
+    {
+      step: 1,
+      name: "Recruiter Screen",
+      likelihood: 100,
+      gate: true,
+      difficulty: "Easy",
+      duration: "30 min",
+      format: "Screening",
+      description: "Initial fit assessment covering motivation, clarity, and compensation expectations.",
+      focus: ["Role motivation", "Communication", "Fit"]
+    },
+    {
+      step: 2,
+      name: "Hiring Manager / Peer Round",
+      likelihood: 88,
+      gate: true,
+      difficulty: "Medium",
+      duration: "45 min",
+      format: "Behavioral + role fit",
+      description: "This round usually checks whether your experience maps to the team’s real day-to-day expectations.",
+      focus: keySkills.slice(0, 3)
+    },
+    {
+      step: 3,
+      name: "Technical / Scenario Round",
+      likelihood: 76,
+      gate: true,
+      difficulty: "Medium",
+      duration: "60 min",
+      format: "Scenario interview",
+      description: "Expect trade-offs, troubleshooting, or system judgment anchored in actual role responsibilities.",
+      focus: keySkills.slice(1, 4)
+    }
+  ];
+}
+
+function buildGeneralTips(keySkills: string[], company: string) {
+  return [
+    `Use one clear impact line before you go deep on ${keySkills[0] ?? "the technical details"}.`,
+    `${company || "The company"} will trust examples more than buzzwords, so anchor answers in real decisions and outcomes.`,
+    "Keep your explanations simple enough for a non-technical listener first, then add the technical layer."
+  ];
+}
+
+function formatWorkModeLabel(value: string | null | undefined) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+
+  if (!normalized) {
+    return "";
+  }
+
+  switch (normalized) {
+    case "remote":
+      return "Remote";
+    case "hybrid":
+      return "Hybrid";
+    case "onsite":
+      return "Onsite";
+    default:
+      return startCase(normalized);
+  }
+}
+
+function buildGeographyLabel(location: string | null | undefined, geography: string | null | undefined, workMode?: string | null) {
+  const locationLabel = String(geography ?? location ?? "").trim();
+  const workModeLabel = formatWorkModeLabel(workMode);
+
+  if (locationLabel && workModeLabel && !locationLabel.toLowerCase().includes(workModeLabel.toLowerCase())) {
+    return `${locationLabel} • ${workModeLabel}`;
+  }
+
+  return locationLabel || workModeLabel;
 }
 
 function buildSuggestedHeadline(targetRole: string, skills: string[]) {
@@ -541,14 +818,18 @@ export async function getJDAnalysis(jobId?: string): Promise<JDAnalysis> {
     jobId
       ? supabase
           .from("jobs")
-          .select("id, company, role_title, description_raw, description_normalized")
+          .select(
+            "id, company, role_title, description_raw, description_normalized, location, geography, work_mode, experience_level, department, required_skills, interview_topics"
+          )
           .eq("id", jobId)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     jobId
       ? supabase
           .from("jd_analyses")
-          .select("id, job_id, company, role, summary, key_skills, rounds, raw_jd, created_at")
+          .select(
+            "id, job_id, company, role, summary, key_skills, rounds, raw_jd, created_at, general_tips, interview_rounds_prediction, employer_signals, what_matters_most, prep_48h, prep_2week, geography, job_family, function_area, seniority, confidence_scores"
+          )
           .eq("user_id", userId)
           .eq("job_id", jobId)
           .order("created_at", { ascending: false })
@@ -556,7 +837,9 @@ export async function getJDAnalysis(jobId?: string): Promise<JDAnalysis> {
           .maybeSingle()
       : supabase
           .from("jd_analyses")
-          .select("id, job_id, company, role, summary, key_skills, rounds, raw_jd, created_at")
+          .select(
+            "id, job_id, company, role, summary, key_skills, rounds, raw_jd, created_at, general_tips, interview_rounds_prediction, employer_signals, what_matters_most, prep_48h, prep_2week, geography, job_family, function_area, seniority, confidence_scores"
+          )
           .eq("user_id", userId)
           .order("created_at", { ascending: false })
           .limit(1)
@@ -577,7 +860,7 @@ export async function getJDAnalysis(jobId?: string): Promise<JDAnalysis> {
 
   const gapResult = await supabase
     .from("skill_gaps")
-    .select("skill_name, importance")
+    .select("skill_name, importance, suggested_actions")
     .eq("jd_analysis_id", latestAnalysisResult.data.id)
     .order("gap_score", { ascending: false })
     .order("created_at", { ascending: false });
@@ -586,40 +869,63 @@ export async function getJDAnalysis(jobId?: string): Promise<JDAnalysis> {
     throw new Error(gapResult.error.message);
   }
 
-  const rounds = Array.isArray(latestAnalysisResult.data.rounds)
-    ? latestAnalysisResult.data.rounds
-        .map((item) => {
-          if (!item || typeof item !== "object") {
-            return null;
-          }
-
-          const round = item as {
-            name?: unknown;
-            focus?: unknown;
-          };
-
-          return {
-            name: String(round.name ?? "Interview round"),
-            focus: Array.isArray(round.focus)
-              ? round.focus.map((topic) => String(topic))
-              : []
-          };
-        })
-        .filter((item): item is { name: string; focus: string[] } => Boolean(item))
-    : [];
+  const keySkills = parseStringArray(latestAnalysisResult.data.key_skills);
+  const role = latestAnalysisResult.data.role ?? jobResult.data?.role_title ?? "";
+  const company = latestAnalysisResult.data.company ?? jobResult.data?.company ?? "";
+  const interviewRounds = parseInterviewRounds(
+    latestAnalysisResult.data.interview_rounds_prediction ?? latestAnalysisResult.data.rounds,
+    keySkills.length ? keySkills : parseStringArray(jobResult.data?.required_skills)
+  );
+  const generalTips = parseStringArray(latestAnalysisResult.data.general_tips);
+  const whatMattersMost = parseThemeCards(
+    latestAnalysisResult.data.what_matters_most,
+    keySkills,
+    role
+  );
+  const employerSignals = parseEmployerSignals(latestAnalysisResult.data.employer_signals, keySkills);
+  const prep48h = parsePrepTasks(
+    latestAnalysisResult.data.prep_48h,
+    "48h sprint",
+    keySkills
+  );
+  const prep2Week = parsePrepTasks(
+    latestAnalysisResult.data.prep_2week,
+    "2-week sprint",
+    keySkills
+  );
+  const confidenceScores = parseConfidenceScores(latestAnalysisResult.data.confidence_scores);
 
   return {
     analysisId: latestAnalysisResult.data.id,
     summary: latestAnalysisResult.data.summary ?? "",
-    keySkills: latestAnalysisResult.data.key_skills ?? [],
+    keySkills,
     criticalGaps: (gapResult.data ?? []).map((gap) => ({
       skill: gap.skill_name,
       importance: gap.importance ? `${gap.importance.charAt(0).toUpperCase()}${gap.importance.slice(1)}` : "Medium",
-      note: "This skill appears central to the job signal and needs concrete examples in interviews."
+      note: "This skill appears central to the job signal and needs concrete examples in interviews.",
+      suggestedActions: parseStringArray(gap.suggested_actions)
     })),
-    interviewRounds: rounds,
-    role: latestAnalysisResult.data.role ?? jobResult.data?.role_title ?? "",
-    company: latestAnalysisResult.data.company ?? jobResult.data?.company ?? "",
+    interviewRounds,
+    whatMattersMost,
+    employerSignals,
+    prep48h,
+    prep2Week,
+    generalTips: generalTips.length ? generalTips : buildGeneralTips(keySkills, company),
+    confidenceScores,
+    role,
+    company,
+    seniority:
+      latestAnalysisResult.data.seniority ??
+      (jobResult.data?.experience_level ? startCase(jobResult.data.experience_level) : ""),
+    geography:
+      latestAnalysisResult.data.geography ??
+      buildGeographyLabel(jobResult.data?.location, jobResult.data?.geography, jobResult.data?.work_mode),
+    jobFamily:
+      latestAnalysisResult.data.job_family ??
+      (keySkills[0] ? `${keySkills[0]} Focus` : ""),
+    functionArea:
+      latestAnalysisResult.data.function_area ??
+      String(jobResult.data?.department ?? "").trim(),
     rawText:
       latestAnalysisResult.data.raw_jd?.trim() ||
       jobResult.data?.description_normalized ||

@@ -182,39 +182,198 @@ export const jobs: JobOpportunity[] = [
 
 export const jdAnalysis: JDAnalysis = {
   summary:
-    "This role values hands-on Azure AD design, Conditional Access policy decisions, and strong troubleshooting with Azure AD Connect and PowerShell.",
+    "This role values hands-on Azure AD design, Conditional Access policy decisions, and strong troubleshooting with Azure AD Connect and PowerShell. The strongest signal is practical identity ownership backed by crisp incident stories and automation examples.",
   keySkills: ["Conditional Access", "Azure AD Connect", "PowerShell", "Zero Trust", "Graph API"],
+  whatMattersMost: [
+    {
+      step: 1,
+      title: "Identity Architecture Judgment",
+      confidence: 95,
+      explanation: "The role expects policy decisions, exception handling, and trade-off thinking, not just ticket execution."
+    },
+    {
+      step: 2,
+      title: "Operational Troubleshooting",
+      confidence: 89,
+      explanation: "Azure AD Connect and hybrid sync issues point to a strong need for calm root-cause analysis."
+    },
+    {
+      step: 3,
+      title: "Automation Muscle",
+      confidence: 84,
+      explanation: "PowerShell and Graph API are likely used to separate operators from engineers."
+    },
+    {
+      step: 4,
+      title: "Security-First Communication",
+      confidence: 78,
+      explanation: "You will need to explain policy impact clearly to admins, auditors, and business stakeholders."
+    },
+    {
+      step: 5,
+      title: "Zero Trust Thinking",
+      confidence: 74,
+      explanation: "The JD rewards candidates who can connect authentication, device posture, and access policy design."
+    }
+  ],
   criticalGaps: [
     {
       skill: "Conditional Access",
       importance: "High",
-      note: "The JD references policy design and exception handling, not just configuration."
+      note: "The JD references policy design and exception handling, not just configuration.",
+      suggestedActions: ["Prepare 2 policy design stories", "Rehearse one exception-handling tradeoff"]
     },
     {
       skill: "Azure AD Connect",
       importance: "High",
-      note: "Troubleshooting sync issues is called out in responsibilities."
+      note: "Troubleshooting sync issues is called out in responsibilities.",
+      suggestedActions: ["Study sync failure patterns", "Map one incident from detection to fix"]
     },
     {
       skill: "PowerShell automation",
       importance: "Medium",
-      note: "Automation is used to separate stronger candidates from operators."
+      note: "Automation is used to separate stronger candidates from operators.",
+      suggestedActions: ["Build one provisioning script", "Explain why automation reduced risk"]
+    }
+  ],
+  employerSignals: [
+    {
+      label: "Hands-on ownership",
+      explanation: "This team likely wants someone who can move from access design to execution without hand-holding.",
+      prepAction: "Prepare one story where you owned a change end to end."
+    },
+    {
+      label: "Hybrid environment pressure",
+      explanation: "Mention of Azure AD Connect suggests the interviewer may test on messy real-world hybrid identity operations.",
+      prepAction: "Rehearse one sync troubleshooting incident with clear sequencing."
+    },
+    {
+      label: "Security posture over checkbox setup",
+      explanation: "Conditional Access and Zero Trust language signal that security reasoning matters more than rote implementation.",
+      prepAction: "Show how you balanced user friction with risk reduction."
     }
   ],
   interviewRounds: [
     {
+      step: 1,
       name: "Recruiter screen",
+      likelihood: 100,
+      gate: true,
+      difficulty: "Easy",
+      duration: "30 min",
+      format: "Screening",
+      description: "Expect motivation, role-fit, and compensation calibration before the technical loop starts.",
       focus: ["Role motivation", "Communication", "Target company fit"]
     },
     {
+      step: 2,
       name: "Identity technical round",
+      likelihood: 90,
+      gate: true,
+      difficulty: "Medium",
+      duration: "60 min",
+      format: "Technical panel",
+      description: "This round will likely test identity design judgment, troubleshooting depth, and policy tradeoffs.",
       focus: ["Conditional Access", "Azure AD Connect", "Authentication flows"]
     },
     {
+      step: 3,
       name: "Scenario round",
+      likelihood: 78,
+      gate: true,
+      difficulty: "Medium",
+      duration: "45 min",
+      format: "Case discussion",
+      description: "Expect troubleshooting prompts that force you to talk through diagnosis, decisions, and recovery.",
       focus: ["Troubleshooting", "Policy design tradeoffs", "Automation choices"]
+    },
+    {
+      step: 4,
+      name: "Leadership / stakeholder round",
+      likelihood: 62,
+      gate: false,
+      difficulty: "Medium",
+      duration: "45 min",
+      format: "Behavioral",
+      description: "This final screen often checks communication maturity, incident ownership, and cross-team trust.",
+      focus: ["Stakeholder management", "Security communication", "Incident ownership"]
     }
-  ]
+  ],
+  prep48h: [
+    {
+      step: 1,
+      title: "Rebuild your Conditional Access mental model",
+      duration: "90 min",
+      resources: ["Microsoft Learn", "Your own incident notes"],
+      note: "Focus on policy conditions, exclusions, and rollout mistakes."
+    },
+    {
+      step: 2,
+      title: "Prepare 2 Azure AD Connect troubleshooting stories",
+      duration: "75 min",
+      resources: ["Personal journal", "Past tickets"],
+      note: "Keep the story sequence simple: symptom, diagnosis, fix, prevention."
+    },
+    {
+      step: 3,
+      title: "Practice one automation walkthrough",
+      duration: "45 min",
+      resources: ["PowerShell repo", "Graph API notes"],
+      note: "Explain the business reason, not just the code."
+    }
+  ],
+  prep2Week: [
+    {
+      step: 1,
+      title: "Map all top identity themes from the JD",
+      duration: "Day 1",
+      resources: ["JD notes", "Company research"],
+      note: "Turn the role into 4 to 5 interview-ready themes."
+    },
+    {
+      step: 2,
+      title: "Build one identity proof-of-work example",
+      duration: "Days 2-5",
+      resources: ["Lab tenant", "GitHub"],
+      note: "A mini project helps you talk beyond theory."
+    },
+    {
+      step: 3,
+      title: "Rehearse 5 core interview stories",
+      duration: "Days 6-9",
+      resources: ["Story bank", "Voice notes"],
+      note: "Cover troubleshooting, automation, stakeholder alignment, outage handling, and policy design."
+    },
+    {
+      step: 4,
+      title: "Simulate the technical loop",
+      duration: "Days 10-12",
+      resources: ["Mock interview", "Prep tracker"],
+      note: "Practice answering out loud with structure, not bullet memorization."
+    },
+    {
+      step: 5,
+      title: "Tighten resume and final role fit",
+      duration: "Days 13-14",
+      resources: ["Resume workspace", "Saved jobs"],
+      note: "Make sure your pitch and resume now match the signals from the JD."
+    }
+  ],
+  generalTips: [
+    "Lead with one sentence on business impact before you go technical.",
+    "Use troubleshooting stories that show sequence, calm thinking, and prevention.",
+    "Quantify improvements in reliability, automation, or incident resolution wherever possible."
+  ],
+  confidenceScores: {
+    skillExtraction: 95,
+    roundPrediction: 87,
+    seniority: 91,
+    companyMatch: 89
+  },
+  seniority: "Mid",
+  geography: "Global/Remote or Hybrid (US/India hubs)",
+  jobFamily: "Identity & Access",
+  functionArea: "Cloud Security"
 };
 
 export const resumeSuggestions: ResumeSuggestion[] = [
@@ -318,4 +477,3 @@ export const onboardingRoleOptions = [
   "Cloud Identity Engineer",
   "Okta Engineer"
 ];
-

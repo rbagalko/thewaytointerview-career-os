@@ -57,14 +57,71 @@ export interface ResourceRecommendation {
   url?: string;
 }
 
+export interface JDGap {
+  skill: string;
+  importance: string;
+  note: string;
+  suggestedActions?: string[];
+}
+
+export interface JDTheme {
+  step: number;
+  title: string;
+  confidence: number;
+  explanation: string;
+}
+
+export interface JDEmployerSignal {
+  label: string;
+  explanation: string;
+  prepAction: string;
+}
+
+export interface JDPrepTask {
+  step: number;
+  title: string;
+  duration: string;
+  resources: string[];
+  note?: string;
+}
+
+export interface JDRound {
+  step: number;
+  name: string;
+  likelihood: number;
+  gate: boolean;
+  difficulty: string;
+  duration: string;
+  format: string;
+  description: string;
+  focus: string[];
+}
+
+export interface JDConfidenceScores {
+  skillExtraction: number;
+  roundPrediction: number;
+  seniority: number;
+  companyMatch: number;
+}
+
 export interface JDAnalysis {
   analysisId?: string;
   summary: string;
   keySkills: string[];
-  criticalGaps: { skill: string; importance: string; note: string }[];
-  interviewRounds: { name: string; focus: string[] }[];
+  criticalGaps: JDGap[];
+  interviewRounds: JDRound[];
+  whatMattersMost: JDTheme[];
+  employerSignals: JDEmployerSignal[];
+  prep48h: JDPrepTask[];
+  prep2Week: JDPrepTask[];
+  generalTips: string[];
+  confidenceScores: JDConfidenceScores;
   role?: string;
   company?: string;
+  seniority?: string;
+  geography?: string;
+  jobFamily?: string;
+  functionArea?: string;
   rawText?: string;
   hasAnalysis?: boolean;
 }
