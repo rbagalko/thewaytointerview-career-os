@@ -144,6 +144,7 @@ export function JDAnalyzerPage() {
   const { data, error, isPending } = useJDAnalysisQuery(selectedJobId);
   const analyzeMutation = useAnalyzeJDMutation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const resultsRef = useRef<HTMLElement | null>(null);
 
   const [inputMode, setInputMode] = useState<InputMode>("text");
   const [activeTab, setActiveTab] = useState<ResultTab>("skills");
@@ -160,6 +161,12 @@ export function JDAnalyzerPage() {
   useEffect(() => {
     if (data?.hasAnalysis) {
       setActiveTab("skills");
+    }
+  }, [data?.analysisId, data?.hasAnalysis]);
+
+  useEffect(() => {
+    if (data?.hasAnalysis && resultsRef.current) {
+      resultsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }, [data?.analysisId, data?.hasAnalysis]);
 
@@ -275,6 +282,8 @@ export function JDAnalyzerPage() {
   }
 
   const hasAnalysis = Boolean(data.hasAnalysis);
+  const displayCompany =
+    data.company && !/^(not specified|unknown|role decoded)$/i.test(data.company.trim()) ? data.company : "";
   const metaChips = [
     data.seniority,
     data.geography,
@@ -421,9 +430,9 @@ export function JDAnalyzerPage() {
       </Panel>
 
       {hasAnalysis ? (
-        <section className="jd-results-shell">
+        <section className="jd-results-shell" ref={resultsRef}>
           <div className="jd-result-hero">
-            <div className="jd-result-kicker">{data.company ? data.company : "Role decoded"}</div>
+            {displayCompany ? <div className="jd-result-kicker">{displayCompany}</div> : null}
             <h2 className="jd-result-title">{data.role || "Target role"}</h2>
             <p className="section-copy jd-result-summary">{data.summary}</p>
 
@@ -452,6 +461,16 @@ export function JDAnalyzerPage() {
               <ConfidenceStat label="Seniority" value={data.confidenceScores.seniority} />
               <ConfidenceStat label="Company match" value={data.confidenceScores.companyMatch} />
             </div>
+
+            {data.keySkills.length ? (
+              <div className="jd-meta-row">
+                {data.keySkills.slice(0, 6).map((skill) => (
+                  <span className="chip" key={skill}>
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           <div className="jd-tab-bar" role="tablist" aria-label="JD intelligence tabs">

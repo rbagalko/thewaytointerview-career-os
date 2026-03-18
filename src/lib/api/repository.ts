@@ -6,6 +6,7 @@ import {
   jobs,
   resumeSuggestions
 } from "@/lib/mock-data";
+import { deriveJDAnalysis } from "@/lib/ai/jdIntelligence";
 import { supabase } from "@/lib/supabase";
 import {
   type ApplicationCard,
@@ -203,7 +204,7 @@ function buildJobMetadata(job: JobOpportunity) {
 }
 
 function buildEmptyJDAnalysis(role = "", company = "", rawText = ""): JDAnalysis {
-  return {
+  return deriveJDAnalysis({
     analysisId: undefined,
     summary: "",
     keySkills: [],
@@ -228,7 +229,7 @@ function buildEmptyJDAnalysis(role = "", company = "", rawText = ""): JDAnalysis
     functionArea: "",
     rawText,
     hasAnalysis: false
-  };
+  });
 }
 
 function startCase(value: string) {
@@ -796,13 +797,13 @@ export async function getJobs(query = "", readinessMin = 0): Promise<JobOpportun
 }
 
 export async function getJDAnalysis(jobId?: string): Promise<JDAnalysis> {
-  const fallback: JDAnalysis = {
+  const fallback: JDAnalysis = deriveJDAnalysis({
     ...jdAnalysis,
     role: dashboardPayload.goal.targetRole,
     company: dashboardPayload.goal.targetCompany,
     rawText: "",
     hasAnalysis: true
-  };
+  });
 
   if (!supabase) {
     return fallback;
@@ -895,7 +896,7 @@ export async function getJDAnalysis(jobId?: string): Promise<JDAnalysis> {
   );
   const confidenceScores = parseConfidenceScores(latestAnalysisResult.data.confidence_scores);
 
-  return {
+  return deriveJDAnalysis({
     analysisId: latestAnalysisResult.data.id,
     summary: latestAnalysisResult.data.summary ?? "",
     keySkills,
@@ -932,7 +933,7 @@ export async function getJDAnalysis(jobId?: string): Promise<JDAnalysis> {
       jobResult.data?.description_raw ||
       "",
     hasAnalysis: true
-  };
+  });
 }
 
 export async function getResumeWorkspace(): Promise<ResumeWorkspacePayload> {
